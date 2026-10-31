@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Truck GO – مسار الشاحنات في الجزائر</title>
+<meta name="theme-color" content="#0a0f1a"><link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--asphalt:#14181f;--panel:#1d232d;--line:#2c3441;--amber:#f5a400;--amber-d:#c98500;--red:#e5484d;--ok:#3ecf8e;--text:#eef1f5;--mut:#98a3b3}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;font-family:'Tajawal',system-ui,sans-serif;background:var(--asphalt);color:var(--text)}
+#map{position:absolute;inset:0}
+header{position:absolute;top:0;inset-inline:0;z-index:500;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(var(--asphalt),rgba(20,24,31,.0))}
+.logo{font-weight:800;font-size:20px;background:var(--asphalt);padding:6px 12px;border-radius:10px;border:2px solid var(--amber)}
+.logo b{color:var(--amber)}
+.icon-btn{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:19px;cursor:pointer}
+#sheet{position:absolute;bottom:0;inset-inline:0;z-index:600;max-height:78%;display:flex;flex-direction:column;background:var(--panel);border-radius:20px 20px 0 0;border-top:3px solid var(--amber);box-shadow:0 -8px 30px rgba(0,0,0,.45);transition:transform .25s}
+#sheet.min{transform:translateY(calc(100% - 52px))}
+#grab{padding:14px;text-align:center;cursor:pointer;font-weight:700;font-size:14px;color:var(--mut)}
+#grab::before{content:"";display:block;width:44px;height:4px;border-radius:2px;background:var(--line);margin:-8px auto 8px}
+#body{overflow-y:auto;padding:0 14px calc(env(safe-area-inset-bottom,0px) + 14px)}
+h2{font-size:15px;font-weight:700;margin:14px 0 8px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label{font-size:12.5px;color:var(--mut);display:block;margin-bottom:3px}
+input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--asphalt);color:var(--text);font:inherit;font-size:15px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--amber)}
+.check{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px}
+.check input{width:20px;height:20px}
+.gauge{display:flex;gap:14px;align-items:center;background:var(--asphalt);border-radius:14px;padding:10px 14px;margin-bottom:10px}
+.gauge svg{flex:none}
+.gauge p{font-size:13px;line-height:1.7;color:var(--mut)}
+.gauge strong{color:var(--amber);font-size:15px}
+.btn{width:100%;padding:13px;border:none;border-radius:12px;font:inherit;font-weight:800;font-size:16px;cursor:pointer;background:var(--amber);color:#1a1300;margin-top:12px}
+.btn:disabled{opacity:.5}
+.btn.alt{background:var(--asphalt);color:var(--text);border:1px solid var(--line);font-weight:500;font-size:14px;margin-top:8px;padding:10px}
+.pill{display:inline-block;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--asphalt);color:var(--text);font:inherit;font-size:13.5px;cursor:pointer;margin:0 0 6px 6px}
+.pill.on{border-color:var(--amber);color:var(--amber)}
+#results-list button{display:block;width:100%;text-align:start;padding:10px;border:none;border-bottom:1px solid var(--line);background:none;color:var(--text);font:inherit;font-size:14px;cursor:pointer}
+#route-box{display:none;margin-top:14px}
+.sum{display:flex;gap:10px}
+.sum div{flex:1;background:var(--asphalt);border-radius:12px;padding:10px;text-align:center}
+.sum b{display:block;font-size:22px;color:var(--amber)}
+.sum span{font-size:12px;color:var(--mut)}
+.note{font-size:12.5px;line-height:1.7;color:var(--mut);background:var(--asphalt);border-radius:10px;padding:10px;margin-top:10px;border-inline-start:3px solid var(--amber)}
+.err{color:#ffb4b6;border-inline-start-color:var(--red)}
+ol#steps{padding-inline-start:22px;margin-top:10px;font-size:13.5px;line-height:1.9;direction:ltr;text-align:left}
+ol#steps small{color:var(--mut)}
+#toast{position:absolute;top:70px;left:50%;transform:translateX(-50%);z-index:900;background:var(--amber);color:#1a1300;font-weight:700;padding:9px 16px;border-radius:12px;display:none;font-size:14px;max-width:90%;text-align:center}
+#modal{position:absolute;inset:0;z-index:1000;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:18px}
+#modal .card{background:var(--panel);border-radius:18px;padding:18px;max-width:420px;width:100%;border-top:3px solid var(--amber)}
+.leaflet-container{font-family:inherit;background:#dfe5ea}
+@media (min-width:760px){#sheet{inset-inline-start:auto;width:410px;inset-inline-end:12px;bottom:12px;border-radius:20px;max-height:calc(100% - 90px)}}
+textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--asphalt);color:var(--text);font:inherit;font-size:14px;min-height:64px;margin-top:8px}
+.sp{position:absolute;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#f5a400;border:2px solid #14181f;box-shadow:0 0 0 2px #fff;color:#14181f;font:800 0/1 Tajawal,sans-serif;display:flex;align-items:center;justify-content:center}
+.z14 .sp{width:22px;height:22px;font-size:11px}
+ol#steps li{cursor:pointer;padding:3px 0}
+.hide{display:none}
+.gauge{width:100%;border:none;color:var(--text);font:inherit;text-align:start;cursor:pointer}
+.trip{margin-top:12px}
+.tl{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:14px}
+.tl span{color:var(--mut);flex:none;width:88px}
+.tl b{flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link{border:none;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;padding:7px 12px;border-radius:10px;white-space:nowrap}
+#use-gps{background:#3ecf8e;color:#06261a}
+#pick-start{background:#4da3ff;color:#06182b}
+#pick-end{background:#e5484d;color:#fff}
+.trip input{margin-top:6px}
+#scrim{position:absolute;inset:0;z-index:1400;background:rgba(0,0,0,.55);display:none}
+#drawer{position:absolute;top:0;bottom:0;inset-inline-start:0;width:min(310px,84%);z-index:1500;background:var(--panel);border-inline-end:3px solid var(--amber);transform:translateX(100%);transition:transform .25s;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 16px;overflow-y:auto}
+body.menu #drawer{transform:none}
+body.menu #scrim{display:block}
+#drawer h3{font-size:13px;color:var(--mut);font-weight:500;margin:18px 0 8px}
+.dh{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px}
+.mi{display:block;width:100%;text-align:start;padding:14px 12px;margin-bottom:8px;border-radius:12px;border:1px solid var(--line);background:var(--asphalt);color:var(--text);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.mi small{display:block;font-weight:400;color:var(--mut);font-size:12.5px;margin-top:2px}
+#rmodal{position:absolute;inset:0;z-index:2000;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:18px}
+#rmodal .card{background:var(--panel);border-radius:18px;padding:18px;max-width:420px;width:100%;max-height:92%;overflow-y:auto;border-top:3px solid var(--amber)}
+#clear-route{display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 68px);inset-inline-start:12px;z-index:900;padding:9px 14px;border-radius:12px;border:2px solid var(--red);background:var(--asphalt);color:#ffb4b6;font:inherit;font-weight:700;font-size:14px;cursor:pointer}
+body.light{--asphalt:#eef1f5;--panel:#ffffff;--line:#d5dbe4;--text:#18212d;--mut:#5f6c7d;--amber:#e09a00;color-scheme:light}
+body.light header{background:linear-gradient(rgba(255,255,255,.9),rgba(255,255,255,0))}
+body.light .logo{background:#fff}
+body.light .err,body.light #clear-route{color:#b42318}
+body.light #sheet{box-shadow:0 -8px 30px rgba(20,30,50,.22)}
+body:not(.light) .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.9)}
+body:not(.light) .leaflet-container{background:#1b1e24}
+.edit-chip{display:inline-block;margin-top:6px;padding:7px 14px;border-radius:10px;background:#8b5cf6;color:#fff;font-weight:700;font-size:13.5px}
+.leaflet-top.leaflet-left{top:calc(env(safe-area-inset-top,0px) + 52px)}
+.leaflet-left .leaflet-control{margin-left:18px}
+
+/* ===== Design v9 ===== */
+:root{--asphalt:#0b111b;--panel:#141c2a;--line:#24324a;--amber:#ffb41f;--ok:#2dd4a0;--text:#f3f6fb;--mut:#9aa9bf}
+body.light{--asphalt:#eef2f8;--panel:#ffffff;--line:#dbe3ef;--text:#142033;--mut:#5b6b82;--amber:#f59e0b}
+.logo{background:var(--panel);border:0;border-radius:14px;box-shadow:0 0 0 2px var(--amber),0 6px 18px rgba(0,0,0,.28);letter-spacing:.3px}
+.icon-btn{border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#sheet{background:color-mix(in srgb,var(--panel) 93%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:2px solid var(--amber);border-radius:26px 26px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.35)}
+#grab::before{width:48px;height:5px;background:var(--mut);opacity:.5}
+input,select,textarea{border-radius:12px;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px color-mix(in srgb,var(--amber) 30%,transparent)}
+.gauge{background:linear-gradient(135deg,var(--asphalt),var(--panel));border:1px solid var(--line);border-radius:18px}
+.pill{border-radius:999px;padding:8px 14px}
+.pill.on{background:color-mix(in srgb,var(--amber) 16%,transparent)}
+.btn{background:linear-gradient(135deg,#ffc83d,#f59a00);border-radius:14px;box-shadow:0 8px 20px rgba(245,154,0,.32);transition:transform .1s}
+.btn:active{transform:scale(.98)}
+.btn.alt{background:var(--asphalt);box-shadow:none}
+.btn.go{background:linear-gradient(135deg,#3ee8b0,#10b981);color:#03271c;box-shadow:0 8px 20px rgba(16,185,129,.3)}
+body.tracking .btn.go{background:linear-gradient(135deg,#ff7478,#e5484d);color:#fff;box-shadow:0 8px 20px rgba(229,72,77,.3)}
+.link{border-radius:999px}
+.sum div{border:1px solid var(--line);border-radius:16px}
+.sum b{font-size:27px}
+ol#steps{list-style:none;counter-reset:s;padding:0;margin-top:12px}
+ol#steps li{counter-increment:s;padding:10px 12px;margin-bottom:6px;background:var(--asphalt);border:1px solid var(--line);border-radius:12px;line-height:1.7}
+ol#steps li::before{content:counter(s);display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--amber);color:#1a1300;font-weight:800;font-size:12px;vertical-align:middle;margin-inline-end:8px}
+#toast{border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+#modal .card,#rmodal .card{border-radius:24px}
+.mi{border-radius:16px}
+#clear-route{border-radius:999px;top:calc(env(safe-area-inset-top,0px) + 126px)}
+.route-line{filter:drop-shadow(0 0 3px rgba(0,0,0,.5))}
+@media (max-width:759px){.leaflet-bottom{bottom:var(--sh,0px)}}
+/* tracking */
+#fab-track{position:absolute;top:calc(env(safe-area-inset-top,0px) + 68px);inset-inline-start:12px;z-index:900;width:50px;height:50px;border-radius:50%;border:2px solid var(--line);background:var(--panel);color:var(--text);font-size:23px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+#fab-track.on{background:var(--ok);border-color:#fff;color:#03271c}
+#fab-track.free{background:var(--amber);color:#1a1300}
+#hud{display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 62px);inset-inline:10px;z-index:700;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;padding:10px 12px;border-radius:20px;color:#fff;background:linear-gradient(135deg,#0f1b33,#16294f);border:1px solid rgba(255,255,255,.14);box-shadow:0 12px 32px rgba(0,0,0,.45)}
+body.nav #hud{display:grid}
+body.nav #fab-track{top:calc(env(safe-area-inset-top,0px) + 180px)}
+body.nav #clear-route{display:none!important}
+body.nav .leaflet-top.leaflet-left{top:calc(env(safe-area-inset-top,0px) + 180px)}
+#hud-ic{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#ffc83d,#f59a00);color:#1a1300;font-size:30px;font-weight:800;display:grid;place-items:center}
+#hud-d{display:block;font-size:28px;font-weight:800;line-height:1.1}
+#hud-t{display:block;font-size:14px;color:#cbd5e1;line-height:1.5}
+#hud-sub{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.12);padding-top:6px;font-size:12.5px;color:#9fb0c8}
+#hud-stop{width:44px;height:44px;border-radius:50%;border:none;background:#e5484d;color:#fff;font-size:18px;cursor:pointer}
+.me{position:relative;width:22px;height:22px;transform:translate(-50%,-50%)}
+.me::before{content:"";position:absolute;inset:-10px;border-radius:50%;background:rgba(47,128,255,.28);animation:pl 2s infinite}
+.me i{position:absolute;inset:0;border-radius:50%;background:#2f80ff;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.45);transform:rotate(var(--r,0deg))}
+.me i::after{content:"";position:absolute;left:50%;top:-13px;margin-left:-6px;border:6px solid transparent;border-top:0;border-bottom:10px solid #2f80ff}
+@keyframes pl{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.6);opacity:0}}
+
+/* ===== v11 ===== */
+:root{--asphalt:#0a0f1a;--panel:#111a2b;--line:#1f2d47;--amber:#ffb81c;--ok:#22d3a0;--text:#f2f6fc;--mut:#94a5bf}
+body.light{--asphalt:#edf1f7;--panel:#fff;--line:#d9e1ee;--text:#101c2e;--mut:#56677f;--amber:#f59e0b}
+.logo{background:linear-gradient(135deg,#0d1424,#1b2a47);color:#fff;border:0;border-radius:16px;padding:7px 16px;box-shadow:inset 0 -3px 0 var(--amber),0 8px 22px rgba(0,0,0,.3)}
+.logo b{color:var(--amber)}
+.icon-btn{width:46px;height:46px;border-radius:50%;background:color-mix(in srgb,var(--panel) 88%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-size:20px}
+#sheet{border-top:0;border-radius:28px 28px 0 0;box-shadow:0 -12px 44px rgba(0,0,0,.4)}
+#sheet::before{content:"";position:absolute;top:0;inset-inline:26px;height:5px;border-radius:0 0 5px 5px;background:repeating-linear-gradient(135deg,var(--amber) 0 12px,transparent 12px 24px)}
+#grab{font-size:15.5px;color:var(--text);padding:18px 14px 10px}
+.tl{background:var(--asphalt);border:1px solid var(--line);border-radius:16px;padding:8px 10px;margin-bottom:8px}
+.tl span{width:auto;font-weight:700}
+.link{padding:9px 13px;font-size:13px}
+#q{margin-top:4px;padding:13px 14px;font-size:15.5px}
+#btn-route,.btn.go{padding:16px;font-size:17px;border-radius:18px}
+#btn-route::before{content:"🛣️ "}
+.pill{padding:9px 15px;font-size:14px}
+.gauge{padding:12px 16px;border-radius:20px}
+.edit-chip{background:linear-gradient(135deg,#8b5cf6,#6d4ae0);border-radius:999px}
+.sum div{background:linear-gradient(160deg,var(--asphalt),var(--panel))}
+#fab-track{width:54px;height:54px;font-size:25px}
+#hud{border-radius:22px;background:linear-gradient(135deg,#0b1328,#14305c)}
+#hud-ic{width:62px;height:62px;border-radius:18px;font-size:34px}
+#hud-d{font-size:32px}
+#hud-sub{display:flex;justify-content:space-between;align-items:center}
+#hud-spd{background:rgba(255,255,255,.12);padding:3px 10px;border-radius:999px;color:#fff;direction:ltr}
+.leaflet-bar{border:0!important;box-shadow:0 4px 14px rgba(0,0,0,.3)!important;border-radius:14px;overflow:hidden}
+.leaflet-popup-content-wrapper{border-radius:16px}
+.sp{background:var(--amber)}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<header>
+  <button class="icon-btn" id="btn-menu" aria-label="القائمة">☰</button>
+  <div class="logo">Truck <b>GO</b> 🚛</div>
+  <button class="icon-btn" id="btn-theme" aria-label="تبديل الوضع الليلي والنهاري">🌙</button>
+</header>
+<div id="toast"></div>
+<div id="hud"><div id="hud-ic">⬆</div><div id="hud-main"><b id="hud-d">–</b><span id="hud-t">–</span></div><button id="hud-stop" aria-label="إيقاف التتبع">⏹</button><div id="hud-sub"><span id="hud-rem"></span><b id="hud-spd">0 km/h</b></div></div>
+<button id="fab-track" aria-label="تتبع موقعي">🧭</button>
+<button id="clear-route">✖ مسح المسار</button>
+<div id="scrim"></div>
+
+<aside id="drawer">
+  <div class="dh"><span>Truck GO 🚛</span><button class="icon-btn" id="menu-x" aria-label="إغلاق">✕</button></div>
+  <h3>اللغة (تعليمات المسار)</h3>
+  <div><button class="pill on" id="lang-ar">العربية</button><button class="pill" id="lang-fr">Français</button></div>
+  <h3>الإرشاد</h3>
+  <button class="mi" id="mi-voice">🔊 الإرشاد الصوتي: <span id="voice-st">تشغيل</span><small>يتبع لغة التعليمات المختارة</small></button>
+  <h3>مساهمة</h3>
+  <button class="mi" id="mi-report">🚧 تقديم بلاغ<small>جسر منخفض، طريق ممنوع على الشاحنات، حد وزن</small></button>
+  <button class="mi" id="mi-comment">💬 تعليق أو اقتراح</button>
+  <p class="note">المسار إرشادي. بيانات الارتفاعات والمنع في الجزائر قد تكون ناقصة، فاحترم اللافتات وتعليمات الطريق دائمًا.</p>
+</aside>
+
+<div id="sheet">
+  <div id="grab">▾ مسار الشاحنة</div>
+  <div id="body">
+    <div id="notice"></div>
+
+    <button class="gauge" id="truck-card" aria-label="تعديل مواصفات الشاحنة">
+      <svg id="truck-svg" width="86" height="76" viewBox="0 0 86 76" aria-hidden="true"></svg>
+      <p>الارتفاع <strong id="g-h">4.0</strong> م · العرض <strong id="g-w">2.5</strong> م<br>الحمولة على المحور <strong id="g-a">–</strong> طن<br><span class="edit-chip">✏️ تعديل المواصفات</span></p>
+    </button>
+    <div id="specs" class="hide">
+      <div id="presets" style="margin-bottom:8px"></div>
+      <div class="row">
+        <div><label>الارتفاع (م)</label><input id="f-h" type="number" step="0.1" min="1" max="6" inputmode="decimal"></div>
+        <div><label>العرض (م)</label><input id="f-w" type="number" step="0.1" min="1" max="4" inputmode="decimal"></div>
+        <div><label>الطول (م)</label><input id="f-l" type="number" step="0.5" min="2" max="30" inputmode="decimal"></div>
+        <div><label>الوزن الكلي (طن)</label><input id="f-m" type="number" step="0.5" min="1" max="80" inputmode="decimal"></div>
+        <div style="grid-column:1/-1"><label>عدد المحاور</label>
+          <select id="f-x"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+      </div>
+      <label class="check"><input type="checkbox" id="f-hz"> تحمل مواد خطرة</label>
+    </div>
+
+    <div class="trip">
+      <div class="tl"><span>📍 الانطلاق</span><b id="s-start">موقعي الحالي</b><button class="link" id="use-gps">📡 موقعي</button><button class="link" id="pick-start">🗺️ الخريطة</button></div>
+      <div class="tl"><span>🏁 الوجهة</span><b id="s-end">لم تُحدَّد</b><button class="link" id="pick-end">🗺️ الخريطة</button></div>
+      <input id="q" type="search" placeholder="ابحث عن الوجهة (مدينة، حي، شارع)" autocomplete="off">
+      <div id="results-list"></div>
+    </div>
+    <button class="btn" id="btn-route">احسب مسار الشاحنة</button>
+
+    <div id="route-box">
+      <div class="sum">
+        <div><b id="r-d">–</b><span>كم</span></div>
+        <div><b id="r-t">–</b><span>المدة</span></div>
+      </div>
+      <button class="btn go" id="btn-track">▶ ابدأ التتبع والملاحة</button>
+      <ol id="steps"></ol>
+    </div>
+  </div>
+</div>
+
+<div id="rmodal">
+  <div class="card">
+    <h2 id="r-title" style="margin-top:0">تقديم بلاغ</h2>
+    <select id="r-type"></select>
+    <div id="r-limit-wrap" style="margin-top:8px"><label id="r-limit-lbl"></label><input id="r-limit" type="number" step="0.1" min="0" inputmode="decimal" placeholder="اختياري"></div>
+    <button class="pill" id="pick-report" style="margin-top:8px">📍 المكان: <span id="s-report">لم يُحدَّد</span></button>
+    <textarea id="r-note" maxlength="300" placeholder="اكتب ما رأيته (أقصى 300 حرف)"></textarea>
+    <button class="btn" id="r-send">إرسال للإدارة</button>
+    <button class="btn alt" id="r-close">إغلاق</button>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyBDH0kf2NBfX6ijHF8mAhpZ-8ryEG8orZI",
+    authDomain: "oran31-2312c.firebaseapp.com",
+    projectId: "oran31-2312c",
+    storageBucket: "oran31-2312c.firebasestorage.app",
+    messagingSenderId: "989297532172",
+    appId: "1:989297532172:web:9dff5e9b800172cbcdfd29"
+  });
+  const db = firebase.firestore();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let zones = [], cfg = {}, zoneLayer = null;
+  const store = {
+    get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch(e){ return d; } },
+    set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  };
+
+  // ---------- Map ----------
+  const map = L.map('map', { zoomControl:false }).setView([35.697, -0.633], 12);
+  L.control.zoom({ position:'topleft' }).addTo(map);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }).addTo(map);
+
+  // ---------- Day / night mode ----------
+  let theme = store.get('theme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  function applyTheme(){ document.body.classList.toggle('light', theme === 'light'); $('btn-theme').textContent = theme === 'light' ? '🌙' : '☀️'; }
+  $('btn-theme').onclick = () => { theme = theme === 'light' ? 'dark' : 'light'; store.set('theme', theme); applyTheme(); };
+  applyTheme();
+
+  // ---------- Truck specs ----------
+  let PRESETS = [
+    { n:'شاحنة صغيرة',  h:2.8, w:2.2,  l:6,    m:7.5, x:2 },
+    { n:'شاحنة 3 محاور', h:3.8, w:2.5,  l:10,   m:26,  x:3 },
+    { n:'نصف مقطورة',   h:4.0, w:2.55, l:16.5, m:40,  x:5 },
+    { n:'صهريج',        h:3.9, w:2.5,  l:12,   m:32,  x:4 }
+  ];
+  const F = { h:$('f-h'), w:$('f-w'), l:$('f-l'), m:$('f-m'), x:$('f-x'), hz:$('f-hz') };
+
+  function renderPresets(){ $('presets').innerHTML = ''; PRESETS.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.className = 'pill'; b.textContent = p.n;
+    b.onclick = () => { fillSpecs(p); [...$('presets').children].forEach(c => c.classList.remove('on')); b.classList.add('on'); };
+    $('presets').appendChild(b);
+  }); }
+  function fillSpecs(p){ F.h.value = p.h; F.w.value = p.w; F.l.value = p.l; F.m.value = p.m; F.x.value = p.x; saveSpecs(); }
+  function readSpecs(){ return { h:+F.h.value, w:+F.w.value, l:+F.l.value, m:+F.m.value, x:+F.x.value, hz:F.hz.checked }; }
+  function saveSpecs(){ store.set('truckSpecs', readSpecs()); drawGauge(); drawZones(); }
+  function drawGauge(){
+    const s = readSpecs();
+    const H = Math.min(Math.max(s.h || 0, 0), 5) / 5 * 64, W = Math.min(Math.max(s.w || 0, 0), 3) / 3 * 70;
+    $('truck-svg').innerHTML =
+      `<line x1="4" y1="72" x2="82" y2="72" stroke="#98a3b3" stroke-width="2"/>` +
+      `<rect x="${43 - W/2}" y="${72 - H}" width="${W}" height="${H}" rx="5" fill="#f5a400" opacity=".9"/>` +
+      `<rect x="${43 - W/2 + 5}" y="${72 - H + 6}" width="${Math.max(W - 10, 0)}" height="${Math.min(H * .3, 18)}" rx="3" fill="#14181f" opacity=".75"/>`;
+    $('g-h').textContent = s.h ? s.h.toFixed(1) : '–';
+    $('g-w').textContent = s.w ? s.w.toFixed(1) : '–';
+    $('g-a').textContent = (s.m && s.x) ? (s.m / s.x).toFixed(1) : '–';
+  }
+  Object.values(F).forEach(el => el.addEventListener('input', saveSpecs));
+  renderPresets();
+  const saved = store.get('truckSpecs', null);
+  if (saved){ F.h.value = saved.h; F.w.value = saved.w; F.l.value = saved.l; F.m.value = saved.m; F.x.value = saved.x; F.hz.checked = !!saved.hz; drawGauge(); }
+  else { fillSpecs(PRESETS[2]); }
+
+  // ---------- Points ----------
+  let start = null, end = null, mode = null, startMk = null, endMk = null, routeLine = null;
+  const pin = (c, t) => L.divIcon({ className:'', iconSize:[30,30], iconAnchor:[15,28],
+    html:`<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${c};border:3px solid #fff;display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:13px">${t}</span></div>` });
+
+  function setPoint(kind, ll, label){
+    const pt = { lat:ll.lat, lng:ll.lng };
+    if (kind === 'start'){ start = pt; if (startMk) map.removeLayer(startMk); startMk = L.marker(ll, { icon:pin('#3ecf8e', '🚛') }).addTo(map); $('s-start').textContent = label || 'على الخريطة'; }
+    else { end = pt; if (endMk) map.removeLayer(endMk); endMk = L.marker(ll, { icon:pin('#e5484d', '🏁') }).addTo(map); $('s-end').textContent = label || 'على الخريطة'; }
+  }
+  function toast(msg, ms = 2600){ const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', ms); }
+  function setMode(m){
+    mode = m; map.getContainer().style.cursor = m ? 'crosshair' : '';
+    if (m){ $('sheet').classList.add('min'); toast({ start:'اضغط نقطة الانطلاق', end:'اضغط الوجهة', report:'اضغط مكان التبليغ' }[m], 4000); }
+  }
+  $('pick-start').onclick = () => setMode('start');
+  $('pick-end').onclick = () => setMode('end');
+  map.on('click', e => {
+    if (!mode) return;
+    if (mode === 'report'){ setReportPoint(e.latlng); $('rmodal').style.display = 'flex'; } else setPoint(mode, e.latlng);
+    setMode(null); $('sheet').classList.remove('min');
+  });
+  const locate = () => new Promise((ok, no) => {
+    if (!navigator.geolocation) return no();
+    navigator.geolocation.getCurrentPosition(p => ok(L.latLng(p.coords.latitude, p.coords.longitude)), no, { enableHighAccuracy:true, timeout:12000 });
+  });
+  $('use-gps').onclick = () => { start = null; if (startMk){ map.removeLayer(startMk); startMk = null; } $('s-start').textContent = 'موقعي الحالي'; };
+
+  // ---------- Destination search (Nominatim, Algeria only) ----------
+  let qTimer;
+  $('q').addEventListener('input', () => {
+    clearTimeout(qTimer); const q = $('q').value.trim(); const box = $('results-list');
+    if (q.length < 3){ box.innerHTML = ''; return; }
+    qTimer = setTimeout(async () => {
+      try {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&countrycodes=dz&limit=5&accept-language=ar&q=' + encodeURIComponent(q));
+        const data = await r.json(); box.innerHTML = '';
+        if (!data.length){ box.innerHTML = '<p class="note">لا توجد نتائج. جرّب اسمًا آخر أو اختر الوجهة من الخريطة.</p>'; return; }
+        data.forEach(d => {
+          const b = document.createElement('button'); b.textContent = d.display_name;
+          b.onclick = () => { const ll = L.latLng(+d.lat, +d.lon); setPoint('end', ll, d.display_name.split(',')[0]); map.setView(ll, 14); box.innerHTML = ''; $('q').value = ''; };
+          box.appendChild(b);
+        });
+      } catch(e){ box.innerHTML = '<p class="note err">تعذّر البحث. تحقق من الإنترنت.</p>'; }
+    }, 500);
+  });
+
+  // ---------- Live data from the admin (Firestore) ----------
+  zoneLayer = L.layerGroup().addTo(map);
+  const ZT = { ban:'ممنوع على الشاحنات', bridge:'جسر منخفض', weight:'حد الوزن' };
+  function zoneApplies(z, s){
+    if (z.active === false) return false;
+    if (z.type === 'bridge') return s.h >= z.limit - 0.1;   // 10 cm safety margin
+    if (z.type === 'weight') return s.m > z.limit;
+    return true;
+  }
+  function ring(z){
+    const r = z.radius || 50, pts = [];
+    for (let i = 0; i < 12; i++){ const a = i / 12 * 2 * Math.PI;
+      pts.push([z.lng + r * Math.cos(a) / (111320 * Math.cos(z.lat * Math.PI / 180)), z.lat + r * Math.sin(a) / 111320]); }
+    pts.push(pts[0]); return pts;
+  }
+  function drawZones(){
+    if (!zoneLayer) return;
+    zoneLayer.clearLayers(); const s = readSpecs(); let n = 0;
+    zones.forEach(z => {
+      const on = zoneApplies(z, s); if (on) n++;
+      const lim = z.type === 'bridge' ? ' (' + z.limit + ' م)' : z.type === 'weight' ? ' (' + z.limit + ' طن)' : '';
+      L.circle([z.lat, z.lng], { radius:z.radius || 50, color:on ? '#e5484d' : '#98a3b3', fillOpacity:on ? .35 : .1, weight:2, dashArray:on ? null : '4 4' })
+        .addTo(zoneLayer).bindPopup('<b>' + (ZT[z.type] || '') + lim + '</b>' + (z.note ? '<br>' + esc(z.note) : '') + (on ? '' : '<br>لا ينطبق على شاحنتك'));
+    });
+  }
+  db.collection('truck_zones').onSnapshot(snap => { zones = snap.docs.map(d => ({ id:d.id, ...d.data() })); drawZones(); },
+    () => { toast('تعذّر تحميل بيانات الطرق. تحقق من الإنترنت'); });
+  db.doc('truck_settings/config').onSnapshot(d => {
+    cfg = d.exists ? d.data() : {};
+    if (Array.isArray(cfg.presets) && cfg.presets.length){ PRESETS = cfg.presets; renderPresets(); }
+    $('notice').innerHTML = cfg.notice ? '<p class="note">📢 ' + esc(cfg.notice) + '</p>' : '';
+  }, () => {});
+
+  // ---------- Driver reports (go to the admin's notifications) ----------
+  let reportPt = null, reportMk = null;
+  function reportUi(){ const t = $('r-type').value, lim = t === 'bridge' || t === 'weight';
+    $('r-limit-wrap').style.display = lim ? 'block' : 'none'; $('r-limit-lbl').textContent = t === 'bridge' ? 'الارتفاع المكتوب على اللافتة (م)' : 'الوزن المكتوب (طن)'; }
+  $('r-type').onchange = reportUi; reportUi();
+  function openReport(kind){
+    const c = kind === 'comment';
+    $('r-type').innerHTML = (c ? [['comment', '💬 تعليق أو اقتراح']] : [['bridge', '🌉 جسر منخفض'], ['ban', '⛔ طريق ممنوع على الشاحنات'], ['weight', '⚖️ حد وزن']])
+      .map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('');
+    $('r-title').textContent = c ? 'تعليق أو اقتراح' : 'تقديم بلاغ';
+    $('r-type').style.display = c ? 'none' : 'block'; $('pick-report').style.display = c ? 'none' : 'inline-block';
+    reportUi(); closeMenu(); $('rmodal').style.display = 'flex';
+  }
+  $('pick-report').onclick = () => { $('rmodal').style.display = 'none'; setMode('report'); };
+  $('r-close').onclick = () => $('rmodal').style.display = 'none';
+  $('mi-report').onclick = () => openReport('report'); $('mi-comment').onclick = () => openReport('comment');
+  const closeMenu = () => document.body.classList.remove('menu');
+  $('btn-menu').onclick = () => document.body.classList.add('menu'); $('scrim').onclick = closeMenu; $('menu-x').onclick = closeMenu;
+  $('truck-card').onclick = () => $('specs').classList.toggle('hide');
+  function setReportPoint(ll){
+    reportPt = { lat:ll.lat, lng:ll.lng }; if (reportMk) map.removeLayer(reportMk);
+    reportMk = L.marker(ll, { icon:pin('#f5a400', '⚠️') }).addTo(map); $('s-report').textContent = 'تم التحديد';
+  }
+  $('r-send').onclick = async () => {
+    const t = $('r-type').value, note = $('r-note').value.trim(), limit = parseFloat($('r-limit').value);
+    if (note.length < 3) return toast('اكتب وصفًا قصيرًا');
+    if (t !== 'comment' && !reportPt) return toast('حدّد مكان التبليغ على الخريطة');
+    if (Date.now() - store.get('lastReport', 0) < 60000) return toast('انتظر دقيقة قبل إرسال تبليغ آخر');
+    const data = { type:t, note, status:'new', createdAt:firebase.firestore.FieldValue.serverTimestamp() };
+    if (reportPt){ data.lat = reportPt.lat; data.lng = reportPt.lng; }
+    if ((t === 'bridge' || t === 'weight') && limit > 0) data.limit = limit;
+    $('r-send').disabled = true;
+    try {
+      await db.collection('truck_reports').add(data); store.set('lastReport', Date.now());
+      toast('شكرًا، وصل تبليغك للإدارة'); $('rmodal').style.display = 'none';
+      $('r-note').value = ''; $('r-limit').value = ''; reportPt = null; $('s-report').textContent = 'لم يُحدَّد';
+      if (reportMk){ map.removeLayer(reportMk); reportMk = null; }
+    } catch(e){ toast(e && e.code === 'permission-denied' ? 'الإدارة لم تفعّل استقبال التبليغات بعد (صلاحيات Firestore)' : 'تعذّر الإرسال (' + ((e && e.code) || 'خطأ') + '). تحقق من الإنترنت وحاول مجددًا', 5000); }
+    $('r-send').disabled = false;
+  };
+
+  // ---------- Turn-by-turn: language switch + numbered points on the route ----------
+  let lastRoute = null, stepMarkers = [], lang = store.get('stepLang', 'ar');
+  const stepLayer = L.layerGroup().addTo(map);
+  const AR = { 0:'انعطف يسارًا', 1:'انعطف يمينًا', 2:'انعطف بحدّة إلى اليسار', 3:'انعطف بحدّة إلى اليمين', 4:'انحرف قليلًا إلى اليسار', 5:'انحرف قليلًا إلى اليمين',
+    6:'تابع مباشرة', 7:'ادخل الدوّار', 8:'اخرج من الدوّار', 9:'قم بالدوران للخلف', 10:'وصلت إلى وجهتك', 11:'ابدأ الرحلة', 12:'حافظ على اليسار', 13:'حافظ على اليمين' };
+  function stepHtml(st){
+    if (lang === 'fr') return esc(st.instruction);
+    let t = AR[st.type] || esc(st.instruction);
+    if (st.type === 7 && st.exit_number) t += ' واخرج من المخرج رقم ' + st.exit_number;
+    if (st.name && st.name !== '-' && st.type !== 10 && st.type !== 7)
+      t += (st.type <= 5 || st.type === 8 ? ' إلى ' : ' على ') + '<bdi>' + esc(st.name) + '</bdi>';
+    return t;
+  }
+  const distTxt = km => lang === 'fr' ? (km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(1) + ' km') : (km < 1 ? Math.round(km * 1000) + ' م' : km.toFixed(1) + ' كم');
+  function drawSteps(){
+    if (!lastRoute) return;
+    const { steps, coords } = lastRoute, ol = $('steps');
+    ol.style.direction = lang === 'ar' ? 'rtl' : 'ltr'; ol.style.textAlign = lang === 'ar' ? 'right' : 'left';
+    $('lang-ar').classList.toggle('on', lang === 'ar'); $('lang-fr').classList.toggle('on', lang === 'fr');
+    if (!stepMarkers.length){
+      stepLayer.clearLayers();
+      steps.forEach((st, i) => { const c = coords[st.way_points[0]]; if (!c) return;
+        stepMarkers[i] = L.marker([c[1], c[0]], { icon:L.divIcon({ className:'', iconSize:[0, 0], html:'<div class="sp">' + (i + 1) + '</div>' }) }).addTo(stepLayer).bindPopup(''); });
+    }
+    ol.innerHTML = '';
+    steps.forEach((st, i) => {
+      const li = document.createElement('li'); li.innerHTML = stepHtml(st) + ' <small>(' + distTxt(st.distance) + ')</small>';
+      li.onclick = () => { const m = stepMarkers[i]; if (!m) return; $('sheet').classList.add('min'); map.setView(m.getLatLng(), Math.max(map.getZoom(), 16)); m.openPopup(); };
+      ol.appendChild(li);
+      if (stepMarkers[i]) stepMarkers[i].setPopupContent('<b>' + (i + 1) + '.</b> ' + stepHtml(st));
+    });
+  }
+  $('lang-ar').onclick = () => { lang = 'ar'; store.set('stepLang', lang); drawSteps(); };
+  $('lang-fr').onclick = () => { lang = 'fr'; store.set('stepLang', lang); drawSteps(); };
+  map.on('zoomend', () => map.getContainer().classList.toggle('z14', map.getZoom() >= 14));
+
+  // ---------- Clear route ----------
+  function clearRoute(){
+    if (routeLine){ map.removeLayer(routeLine); routeLine = null; }
+    stepLayer.clearLayers(); stepMarkers = []; lastRoute = null;
+    [startMk, endMk].forEach(m => { if (m) map.removeLayer(m); }); startMk = endMk = null; start = end = null;
+    $('s-start').textContent = 'موقعي الحالي'; $('s-end').textContent = 'لم تُحدَّد';
+    $('q').value = ''; $('results-list').innerHTML = ''; $('steps').innerHTML = '';
+    $('r-d').textContent = '–'; $('r-t').textContent = '–';
+    $('route-box').style.display = 'none'; $('clear-route').style.display = 'none';
+    map.closePopup(); document.body.classList.remove('nav'); $('sheet').classList.remove('min'); toast('تم مسح المسار');
+  }
+  $('clear-route').onclick = clearRoute;
+
+  // ---------- Routing (OpenRouteService, HGV profile) ----------
+  const fmtTime = s => { const m = Math.round(s / 60); return m < 60 ? m + ' د' : Math.floor(m / 60) + ' س ' + (m % 60) + ' د'; };
+  function showError(msg){ const n = document.createElement('p'); n.className = 'note err'; n.textContent = msg; $('btn-route').after(n); setTimeout(() => n.remove(), 9000); }
+
+  async function calcRoute(opts = {}){
+    const key = cfg.orsKey;
+    if (!key) return toast('الخدمة غير متاحة حاليًا. حاول لاحقًا');
+    if (!end) return toast('اختر الوجهة أولًا');
+    if (!start){ try { setPoint('start', await locate(), 'موقعي الحالي'); } catch(e){ return toast('فعّل الموقع أو اختر نقطة الانطلاق من الخريطة', 4000); } }
+    const s = readSpecs();
+    if (![s.h, s.w, s.l, s.m].every(v => v > 0)) return toast('أكمل مواصفات الشاحنة');
+    const restrictions = { height:s.h, width:s.w, length:s.l, weight:s.m, axleload:+(s.m / s.x).toFixed(2) };
+    if (s.hz) restrictions.hazmat = true;
+    const options = { profile_params:{ restrictions } };
+    const az = zones.filter(z => zoneApplies(z, s));
+    if (az.length) options.avoid_polygons = { type:'MultiPolygon', coordinates: az.map(z => [ring(z)]) };
+    $('btn-route').disabled = true; $('btn-route').textContent = 'جاري الحساب…';
+    try {
+      const r = await fetch('https://api.openrouteservice.org/v2/directions/driving-hgv/geojson', {
+        method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':key },
+        body: JSON.stringify({ coordinates:[[start.lng, start.lat], [end.lng, end.lat]], language:'fr', units:'km', instructions:true, options })
+      });
+      const data = await r.json();
+      if (!r.ok){
+        const code = data && data.error && data.error.code;
+        if (r.status === 401 || r.status === 403) throw new Error('مفتاح الخدمة غير صالح. أبلغ الإدارة.');
+        if (code === 2010) throw new Error('إحدى النقطتين بعيدة عن طريق صالح للشاحنات. حرّكها قليلًا نحو طريق رئيسي.');
+        if (code === 2004 || code === 2003) throw new Error('المسافة تتجاوز الحد المسموح في الحساب المجاني.');
+        if (code === 2009) throw new Error('لا يوجد مسار يناسب أبعاد شاحنتك والمناطق الممنوعة المحددة.');
+        throw new Error('تعذّر حساب المسار (رمز ' + (code || r.status) + ').');
+      }
+      const f = data.features[0], sum = f.properties.summary;
+      if (routeLine) map.removeLayer(routeLine);
+      routeLine = L.geoJSON(f, { style:{ color:'#2f80ff', weight:8, opacity:.92, className:'route-line' } }).addTo(map);
+      if (!opts.reroute) map.fitBounds(routeLine.getBounds(), { padding:[40, 40] });
+      $('r-d').textContent = sum.distance.toFixed(1); $('r-t').textContent = fmtTime(sum.duration);
+      stepMarkers = []; lastRoute = { steps:f.properties.segments.flatMap(sg => sg.steps), coords:f.geometry.coordinates, dur:sum.duration, dist:sum.distance * 1000 }; drawSteps();
+      $('clear-route').style.display = 'block'; $('route-box').style.display = 'block'; if (!opts.reroute) $('route-box').scrollIntoView({ behavior:'smooth' });
+      if (tracking){ document.body.classList.add('nav'); offCount = 0; if (opts.reroute) toast('تم تحديث المسار ✔'); }
+    } catch(e){ showError(e.message.includes('Failed') ? 'تعذّر الاتصال. تحقق من الإنترنت.' : e.message); }
+    finally { $('btn-route').disabled = false; $('btn-route').textContent = 'احسب مسار الشاحنة'; }
+  }
+  $('btn-route').onclick = () => calcRoute();
+
+
+  // ---------- Voice guidance ----------
+  let voiceOn = store.get('voice', true);
+  function say(t){ if (!voiceOn || !window.speechSynthesis) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = lang === 'fr' ? 'fr-FR' : 'ar'; u.rate = .95; u.onerror = e => { if (e.error !== 'interrupted' && e.error !== 'canceled') toast('تعذّر تشغيل الصوت. ثبّت صوتًا عربيًا من إعدادات الهاتف أو ارفع مستوى الصوت', 5000); }; speechSynthesis.speak(u); } catch(e){} }
+  $('voice-st').textContent = voiceOn ? 'تشغيل' : 'إيقاف';
+  $('mi-voice').onclick = () => { voiceOn = !voiceOn; store.set('voice', voiceOn); $('voice-st').textContent = voiceOn ? 'تشغيل' : 'إيقاف'; if (!voiceOn && window.speechSynthesis) speechSynthesis.cancel(); };
+
+  // ---------- Live tracking + auto reroute ----------
+  let tracking = false, watchId = null, meMk = null, follow = true, first = true, offCount = 0, lastRr = 0, rerouting = false, lastFix = null, wake = null;
+  const ICO = { 0:'⬅', 1:'➡', 2:'↰', 3:'↱', 4:'↖', 5:'↗', 6:'⬆', 7:'⟳', 8:'⟳', 9:'↩', 10:'🏁', 11:'⬆', 12:'↖', 13:'↗' };
+  const MPD = 111320;
+  const bearing = (a, b) => { const r = Math.PI / 180, y = Math.sin((b.lng - a.lng) * r) * Math.cos(b.lat * r),
+    x = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos((b.lng - a.lng) * r); return (Math.atan2(y, x) / r + 360) % 360; };
+  function prep(){ const r = lastRoute; if (!r || r.cum) return; const c = r.coords; r.cum = [0];
+    for (let i = 1; i < c.length; i++) r.cum[i] = r.cum[i - 1] + L.latLng(c[i - 1][1], c[i - 1][0]).distanceTo(L.latLng(c[i][1], c[i][0])); }
+  function nearest(p){
+    const c = lastRoute.coords, k = Math.cos(p.lat * Math.PI / 180); let best = { d:Infinity, i:0, t:0 };
+    for (let i = 0; i < c.length - 1; i++){
+      const ax = (c[i][0] - p.lng) * MPD * k, ay = (c[i][1] - p.lat) * MPD, bx = (c[i + 1][0] - p.lng) * MPD * k, by = (c[i + 1][1] - p.lat) * MPD;
+      const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2)) : 0;
+      const d = Math.hypot(ax + t * dx, ay + t * dy); if (d < best.d) best = { d, i, t };
+    }
+    return best;
+  }
+  async function doReroute(ll){
+    rerouting = true; lastRr = Date.now(); offCount = 0;
+    $('hud-ic').textContent = '⟳'; $('hud-t').textContent = 'انحرفت عن المسار… جاري إعادة الحساب'; say(lang === 'fr' ? "Recalcul de l'itinéraire" : 'أعيد حساب المسار');
+    start = { lat:ll.lat, lng:ll.lng }; $('s-start').textContent = 'موقعي الحالي';
+    await calcRoute({ reroute:true });
+    rerouting = false;
+  }
+  function navUpdate(ll, acc){
+    if (rerouting) return;
+    prep(); const r = lastRoute, n = nearest({ lat:ll.lat, lng:ll.lng });
+    offCount = n.d > Math.min(Math.max(45, acc * 1.5), 120) ? offCount + 1 : 0;
+    if (offCount >= 3 && Date.now() - lastRr > 15000) return doReroute(ll);
+    const along = r.cum[n.i] + n.t * (r.cum[n.i + 1] - r.cum[n.i]), total = r.cum[r.cum.length - 1];
+    let k = r.steps.findIndex(s => s.way_points[1] > n.i); if (k < 0) k = r.steps.length - 1;
+    const nx = r.steps[Math.min(k + 1, r.steps.length - 1)], dn = Math.max(0, r.cum[nx.way_points[0]] - along), left = Math.max(0, total - along);
+    $('hud-ic').textContent = ICO[nx.type] || '⬆'; $('hud-d').textContent = distTxt(dn / 1000); $('hud-t').innerHTML = stepHtml(nx);
+    $('hud-rem').textContent = distTxt(left / 1000) + ' · ' + fmtTime(r.dur * left / (r.dist || total || 1));
+    const sp = r.sp || (r.sp = {}), tx = stepHtml(nx).replace(/<[^>]+>/g, '');
+    if (dn < 60 && !sp[k + 'b']){ sp[k + 'a'] = sp[k + 'b'] = 1; say(tx); }
+    else if (dn < 400 && dn >= 60 && !sp[k + 'a']){ sp[k + 'a'] = 1; const d = Math.round(dn / 50) * 50; say((lang === 'fr' ? 'Dans ' + d + ' mètres, ' : 'بعد ' + d + ' متر، ') + tx); }
+    if (left < 30){ toast(lang === 'fr' ? 'Vous êtes arrivé 🏁' : 'وصلت إلى وجهتك 🏁', 5000); say(lang === 'fr' ? 'Vous êtes arrivé' : 'وصلت إلى وجهتك'); stopTrack(); }
+  }
+  function onPos(pos){
+    const c = pos.coords, ll = L.latLng(c.latitude, c.longitude), acc = c.accuracy || 0; if (acc > 120) return;
+    let hd = c.heading; if ((hd == null || isNaN(hd)) && lastFix && lastFix.distanceTo(ll) > 5) hd = bearing(lastFix, ll);
+    lastFix = ll; if (c.speed != null && !isNaN(c.speed)) $('hud-spd').textContent = Math.round(c.speed * 3.6) + ' km/h';
+    if (!meMk) meMk = L.marker(ll, { icon:L.divIcon({ className:'', iconSize:[0, 0], html:'<div class="me"><i></i></div>' }), zIndexOffset:2000, interactive:false }).addTo(map);
+    meMk.setLatLng(ll);
+    const el = meMk.getElement() && meMk.getElement().firstChild; if (el && hd != null && !isNaN(hd)) el.style.setProperty('--r', hd + 'deg');
+    if (follow){ if (first){ map.setView(ll, 16); first = false; } else map.panTo(ll); }
+    if (lastRoute) navUpdate(ll, acc);
+  }
+  async function startTrack(){
+    if (!navigator.geolocation) return toast('الموقع غير مدعوم في هذا الجهاز');
+    tracking = true; follow = true; first = true; offCount = 0;
+    if (window.speechSynthesis) say(lang === 'fr' ? 'Le trajet a commencé' : 'بدأت الرحلة'); else toast('الصوت غير مدعوم في هذا المتصفح');
+    document.body.classList.add('tracking'); document.body.classList.toggle('nav', !!lastRoute);
+    $('sheet').classList.add('min'); $('fab-track').classList.add('on'); $('fab-track').textContent = '🧭'; $('btn-track').textContent = '⏹ إيقاف التتبع';
+    watchId = navigator.geolocation.watchPosition(onPos, e => { toast(e.code === 1 ? 'اسمح للتطبيق بالوصول إلى الموقع' : 'تعذّر تحديد الموقع', 4000); if (e.code === 1) stopTrack(); },
+      { enableHighAccuracy:true, maximumAge:1000, timeout:20000 });
+    try { wake = await navigator.wakeLock.request('screen'); } catch(e){}
+  }
+  function stopTrack(){
+    tracking = false; if (watchId != null) navigator.geolocation.clearWatch(watchId); watchId = null; lastFix = null;
+    if (wake){ wake.release().catch(() => {}); wake = null; }
+    if (meMk){ map.removeLayer(meMk); meMk = null; }
+    $('sheet').classList.remove('min'); document.body.classList.remove('tracking', 'nav'); $('fab-track').classList.remove('on', 'free'); $('fab-track').textContent = '🧭'; $('btn-track').textContent = '▶ ابدأ التتبع والملاحة';
+  }
+  const toggleTrack = () => tracking ? stopTrack() : startTrack();
+  $('btn-track').onclick = toggleTrack; $('hud-stop').onclick = stopTrack;
+  $('fab-track').onclick = () => { if (tracking && !follow){ follow = true; $('fab-track').classList.remove('free'); $('fab-track').textContent = '🧭'; if (lastFix) map.panTo(lastFix); } else toggleTrack(); };
+  map.on('dragstart', () => { if (tracking){ follow = false; $('fab-track').classList.add('free'); $('fab-track').textContent = '🎯'; } });
+  document.addEventListener('visibilitychange', async () => { if (tracking && document.visibilityState === 'visible'){ try { wake = await navigator.wakeLock.request('screen'); } catch(e){} } });
+
+  // ---------- Settings / sheet ----------
+  const fixSh = () => document.body.style.setProperty('--sh', ($('sheet').classList.contains('min') ? 52 : $('sheet').offsetHeight) + 'px');
+  new ResizeObserver(fixSh).observe($('sheet')); new MutationObserver(fixSh).observe($('sheet'), { attributes:true, attributeFilter:['class'] }); fixSh();
+  $('grab').onclick = () => $('sheet').classList.toggle('min');
+  L.DomEvent.disableClickPropagation($('sheet'));
+})();
+</script>
+<script>if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));</script>
+</body>
+</html>
