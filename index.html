@@ -542,24 +542,38 @@ body.nav #toast{top:calc(env(safe-area-inset-top,0px) + 192px)}
   if (window.speechSynthesis){ loadV(); speechSynthesis.onvoiceschanged = loadV; }
   const hasV = l => voices.some(v => v.lang && v.lang.toLowerCase().startsWith(l));
   function beep(){ try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); g.gain.value = .2; o.frequency.value = 880; o.start(); o.stop(a.currentTime + .3); } catch(e){} }
-  function say(ar, fr, test){
-    if ((!voiceOn && !test) || !window.speechSynthesis) return;
+  let aud = null;
+  function localSpeak(text, l){
     try {
-      const fb = lang === 'fr' || (!hasV('ar') && hasV('fr')), l = fb ? 'fr' : 'ar';
       const v = voices.find(x => x.lang && x.lang.toLowerCase().startsWith(l)) || null;
       if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
       speechSynthesis.resume();
-      const u = new SpeechSynthesisUtterance(fb ? (fr || ar) : ar);
-      u.lang = fb ? 'fr-FR' : 'ar-SA'; if (v){ u.voice = v; u.lang = v.lang; }
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = l === 'fr' ? 'fr-FR' : 'ar-SA'; if (v){ u.voice = v; u.lang = v.lang; }
       u.rate = .95; u.volume = 1;
-      u.onerror = e => { if (e.error !== 'interrupted' && e.error !== 'canceled') toast('تعذّر تشغيل الصوت. جرّب ☰ ثم اختبار الصوت', 5000); };
       setTimeout(() => speechSynthesis.speak(u), 80);
     } catch(e){}
+  }
+  function onlineSpeak(text, l, fallback){
+    try {
+      if (!aud) aud = new Audio();
+      aud.pause(); aud.volume = 1;
+      aud.onerror = () => { if (fallback) fallback(); else toast('تعذّر تشغيل الصوت عبر الإنترنت', 4000); };
+      aud.src = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=' + l + '&q=' + encodeURIComponent(text.slice(0, 190));
+      const pr = aud.play(); if (pr && pr.catch) pr.catch(() => { if (fallback) fallback(); });
+    } catch(e){ if (fallback) fallback(); }
+  }
+  function say(ar, fr, test){
+    if (!voiceOn && !test) return;
+    const l = lang === 'fr' ? 'fr' : 'ar', text = l === 'fr' ? (fr || ar) : ar;
+    if (window.speechSynthesis && hasV(l)) return localSpeak(text, l);
+    const back = window.speechSynthesis && hasV('fr') ? () => localSpeak(fr || ar, 'fr') : null;
+    onlineSpeak(text, l, back);
   }
   $('voice-st').textContent = voiceOn ? 'تشغيل' : 'إيقاف';
   $('mi-vtest').onclick = () => { closeMenu(); beep(); say('اختبار الصوت، بدأت الرحلة', 'Test du son, le trajet a commencé', true);
     const ar = voices.some(v => v.lang && v.lang.toLowerCase().startsWith('ar'));
-    toast(!window.speechSynthesis ? 'هذا المتصفح لا يدعم النطق. جرّب Chrome' : (voices.length ? 'عدد الأصوات: ' + voices.length + ' · عربي: ' + (ar ? 'موجود' : 'غير موجود') + ' · فرنسي: ' + (hasV('fr') ? 'موجود' : 'غير موجود') : 'لا توجد أصوات في هذا المتصفح'), 7000); };
+    toast(!window.speechSynthesis ? 'هذا المتصفح لا يدعم النطق. جرّب Chrome' : (voices.length ? 'عدد الأصوات: ' + voices.length + ' · عربي: ' + (ar ? 'موجود' : 'غير موجود') + ' · فرنسي: ' + (hasV('fr') ? 'موجود' : 'غير موجود') + (ar ? '' : ' · سيُستعمل صوت الإنترنت') : 'لا توجد أصوات في هذا المتصفح'), 7000); };
   $('mi-voice').onclick = () => { voiceOn = !voiceOn; store.set('voice', voiceOn); $('voice-st').textContent = voiceOn ? 'تشغيل' : 'إيقاف'; if (!voiceOn && window.speechSynthesis) speechSynthesis.cancel(); };
 
   // ---------- Live tracking + auto reroute ----------
@@ -614,7 +628,7 @@ body.nav #toast{top:calc(env(safe-area-inset-top,0px) + 192px)}
   async function startTrack(){
     if (!navigator.geolocation) return toast('الموقع غير مدعوم في هذا الجهاز');
     tracking = true; follow = true; first = true; offCount = 0;
-    beep(); if (window.speechSynthesis){ say('بدأت الرحلة', 'Le trajet a commencé'); if (lang === 'ar' && voices.length && !hasV('ar')) toast(hasV('fr') ? 'لا يوجد صوت عربي، سيُستعمل الصوت الفرنسي للإرشاد' : 'لا يوجد صوت عربي أو فرنسي في هاتفك. ثبّت Google TTS', 6000); } else toast('الصوت غير مدعوم في هذا المتصفح');
+    beep(); if (window.speechSynthesis){ say('بدأت الرحلة', 'Le trajet a commencé'); if (lang === 'ar' && !hasV('ar')) toast('لا يوجد صوت عربي في الهاتف، سيُستعمل صوت الإنترنت', 5000); } else toast('الصوت غير مدعوم في هذا المتصفح');
     document.body.classList.add('tracking'); document.body.classList.toggle('nav', !!lastRoute);
     $('sheet').classList.add('min'); $('fab-track').classList.add('on'); $('fab-track').textContent = '🧭'; $('btn-track').textContent = '⏹ إيقاف التتبع';
     watchId = navigator.geolocation.watchPosition(onPos, e => { toast(e.code === 1 ? 'اسمح للتطبيق بالوصول إلى الموقع' : 'تعذّر تحديد الموقع', 4000); if (e.code === 1) stopTrack(); },
