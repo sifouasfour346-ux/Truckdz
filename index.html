@@ -187,6 +187,7 @@ body.light{--asphalt:#edf1f7;--panel:#fff;--line:#d9e1ee;--text:#101c2e;--mut:#5
   <div><button class="pill on" id="lang-ar">العربية</button><button class="pill" id="lang-fr">Français</button></div>
   <h3>الإرشاد</h3>
   <button class="mi" id="mi-voice">🔊 الإرشاد الصوتي: <span id="voice-st">تشغيل</span><small>يتبع لغة التعليمات المختارة</small></button>
+  <button class="mi" id="mi-vtest">🔈 اختبار الصوت<small>نغمة ثم جملة، ويعرض حالة الأصوات في هاتفك</small></button>
   <h3>مساهمة</h3>
   <button class="mi" id="mi-report">🚧 تقديم بلاغ<small>جسر منخفض، طريق ممنوع على الشاحنات، حد وزن</small></button>
   <button class="mi" id="mi-comment">💬 تعليق أو اقتراح</button>
@@ -533,8 +534,27 @@ body.light{--asphalt:#edf1f7;--panel:#fff;--line:#d9e1ee;--text:#101c2e;--mut:#5
 
   // ---------- Voice guidance ----------
   let voiceOn = store.get('voice', true);
-  function say(t){ if (!voiceOn || !window.speechSynthesis) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = lang === 'fr' ? 'fr-FR' : 'ar'; u.rate = .95; u.onerror = e => { if (e.error !== 'interrupted' && e.error !== 'canceled') toast('تعذّر تشغيل الصوت. ثبّت صوتًا عربيًا من إعدادات الهاتف أو ارفع مستوى الصوت', 5000); }; speechSynthesis.speak(u); } catch(e){} }
+  let voices = [];
+  const loadV = () => { try { voices = speechSynthesis.getVoices() || []; } catch(e){} };
+  if (window.speechSynthesis){ loadV(); speechSynthesis.onvoiceschanged = loadV; }
+  const pickV = () => { const l = lang === 'fr' ? 'fr' : 'ar'; return voices.find(v => v.lang && v.lang.toLowerCase().startsWith(l)) || null; };
+  function beep(){ try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); g.gain.value = .2; o.frequency.value = 880; o.start(); o.stop(a.currentTime + .3); } catch(e){} }
+  function say(t, test){
+    if ((!voiceOn && !test) || !window.speechSynthesis) return;
+    try {
+      if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+      speechSynthesis.resume();
+      const u = new SpeechSynthesisUtterance(t), v = pickV();
+      u.lang = lang === 'fr' ? 'fr-FR' : 'ar-SA'; if (v){ u.voice = v; u.lang = v.lang; }
+      u.rate = .95; u.volume = 1;
+      u.onerror = e => { if (e.error !== 'interrupted' && e.error !== 'canceled') toast('تعذّر تشغيل الصوت. جرّب ☰ ثم اختبار الصوت', 5000); };
+      setTimeout(() => speechSynthesis.speak(u), 80);
+    } catch(e){}
+  }
   $('voice-st').textContent = voiceOn ? 'تشغيل' : 'إيقاف';
+  $('mi-vtest').onclick = () => { closeMenu(); beep(); say(lang === 'fr' ? 'Test du son' : 'اختبار الصوت، بدأت الرحلة', true);
+    const ar = voices.some(v => v.lang && v.lang.toLowerCase().startsWith('ar'));
+    toast(!window.speechSynthesis ? 'هذا المتصفح لا يدعم النطق. جرّب Chrome' : (voices.length ? 'عدد الأصوات: ' + voices.length + ' · صوت عربي: ' + (ar ? 'موجود' : 'غير موجود') : 'لا توجد أصوات في هذا المتصفح'), 7000); };
   $('mi-voice').onclick = () => { voiceOn = !voiceOn; store.set('voice', voiceOn); $('voice-st').textContent = voiceOn ? 'تشغيل' : 'إيقاف'; if (!voiceOn && window.speechSynthesis) speechSynthesis.cancel(); };
 
   // ---------- Live tracking + auto reroute ----------
@@ -589,7 +609,7 @@ body.light{--asphalt:#edf1f7;--panel:#fff;--line:#d9e1ee;--text:#101c2e;--mut:#5
   async function startTrack(){
     if (!navigator.geolocation) return toast('الموقع غير مدعوم في هذا الجهاز');
     tracking = true; follow = true; first = true; offCount = 0;
-    if (window.speechSynthesis) say(lang === 'fr' ? 'Le trajet a commencé' : 'بدأت الرحلة'); else toast('الصوت غير مدعوم في هذا المتصفح');
+    beep(); if (window.speechSynthesis){ say(lang === 'fr' ? 'Le trajet a commencé' : 'بدأت الرحلة'); if (voices.length && !pickV()) toast('لا يوجد صوت عربي في هاتفك. افتح ☰ ثم اختبار الصوت', 6000); } else toast('الصوت غير مدعوم في هذا المتصفح');
     document.body.classList.add('tracking'); document.body.classList.toggle('nav', !!lastRoute);
     $('sheet').classList.add('min'); $('fab-track').classList.add('on'); $('fab-track').textContent = '🧭'; $('btn-track').textContent = '⏹ إيقاف التتبع';
     watchId = navigator.geolocation.watchPosition(onPos, e => { toast(e.code === 1 ? 'اسمح للتطبيق بالوصول إلى الموقع' : 'تعذّر تحديد الموقع', 4000); if (e.code === 1) stopTrack(); },
